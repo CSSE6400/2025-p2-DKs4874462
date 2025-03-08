@@ -53,12 +53,18 @@ def create_todo():
 def update_todo(todo_id):
     todo = Todo.query.get(todo_id)
     if todo is None:
-        return jsonify({'error': 'Todo not found'})
+        return jsonify({'error': 'Todo not found'}), 404
     
+    allowed_fields = TEST_ITEM.keys()
+    for field in request.json:
+        if field not in allowed_fields:
+            return jsonify({'error': 'no extra words'}), 400
+
     todo.title = request.json.get('title',todo.title)
     todo.description = request.json.get('description',todo.description)
     todo.completed = request.json.get('completed',todo.completed)
     todo.deadline_at = request.json.get('deadline_at',todo.deadline_at)
+
     db.session.commit()
     return jsonify(todo.to_dict())
 
