@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from todo.models import db
 from todo.models.todo import Todo
-from datetime import datetime
+from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__, url_prefix='/api/v1') 
 
@@ -23,9 +23,21 @@ def health():
 
 @api.route('/todos', methods=['GET'])
 def get_todos():
+    completed = request.args.get('completed')
+    window = request.args.get('window')
+
     todos = Todo.query.all()
     result = []
-    for todo  in  todos:
+    for todo in todos:
+        if completed is not None:
+            if str(todo.completed).lower() != completed:
+                continue
+
+        if window is not None:
+            date_limit = datetime.utcnow() + timedelta(days=int(window))
+            if todo.deadline_at > date_limit:
+                continue
+
         result.append(todo.to_dict())
     return jsonify(result)
 
@@ -45,6 +57,11 @@ def create_todo():
     )
     if 'deadline_at' in request.json:
         todo.deadline_at = datetime.fromisoformat(request.json.get('deadline_at'))
+    for item in request.json:
+        if item not in TEST_ITEM.keys():
+            return jsonify({'error': 'extra words'}), 400
+    if "title" not in request.json:
+        return jsonify({'error': 'missing title'}), 400
     db.session.add(todo)
     db.session.commit()
     return jsonify(todo.to_dict()), 201
@@ -55,10 +72,13 @@ def update_todo(todo_id):
     if todo is None:
         return jsonify({'error': 'Todo not found'}), 404
     
-    allowed_fields = TEST_ITEM.keys()
-    for field in request.json:
-        if field not in allowed_fields:
-            return jsonify({'error': 'no extra words'}), 400
+    # for item in request.json:
+    #     if item not in TEST_ITEM.keys():
+    #         return jsonify({'error': 'extra words'}), 400
+
+    if not set(request.json.keys()).issubset(set(('title', 'description', 'completed', 'deadline_at'))):
+        return jsonify({'error': 'extra fields'}), 400
+    
 
     todo.title = request.json.get('title',todo.title)
     todo.description = request.json.get('description',todo.description)
